@@ -1,0 +1,111 @@
+basePath: /api/auth
+definitions:
+  auth.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  auth.RegisterRequest:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      password:
+        type: string
+      phone:
+        type: string
+    type: object
+  models.User:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      first_name:
+        type: string
+      id:
+        type: string
+      join_date:
+        type: string
+      last_name:
+        type: string
+      membership_type:
+        type: string
+      phone:
+        type: string
+      role:
+        type: string
+      updated_at:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: API для регистрации, входа и управления пользователями.
+  title: Gym Auth Service API
+  version: "1.0"
+paths:
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Аутентификация пользователя и получение JWT токена
+      parameters:
+      - description: Данные для входа
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: неверные учётные данные
+          schema:
+            type: string
+      summary: Вход
+      tags:
+      - auth
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Создаёт нового пользователя с указанными данными
+      parameters:
+      - description: Данные пользователя
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.User'
+        "400":
+          description: неверный запрос
+          schema:
+            type: string
+        "409":
+          description: конфликт
+          schema:
+            type: string
+      summary: Регистрация
+      tags:
+      - auth
+swagger: "2.0"
