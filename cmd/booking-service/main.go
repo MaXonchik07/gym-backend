@@ -26,20 +26,22 @@ func main() {
 	}
 	defer pool.Close()
 
+	msgRepo := booking.NewMessageRepository(pool)
+	hub := booking.NewHub(log, msgRepo)
 	repo := booking.NewRepository(pool)
 	svc := booking.NewService(repo)
-	hub := booking.NewHub(log)
 	handler := booking.NewHandler(svc, log, hub)
 
 	mux := http.NewServeMux()
 	authMux := http.NewServeMux()
-	mux.HandleFunc("/ws", hub.HandleWebSocket)
 	authMux.HandleFunc("/api/bookings", handler.GetBookings)
 	authMux.HandleFunc("/api/bookings/create", handler.BookClass)
 	authMux.HandleFunc("/api/bookings/cancel", handler.CancelBooking)
 	mux.Handle("/api/bookings", middleware.AuthMiddleware(cfg.JWTSecret)(authMux))
 	mux.Handle("/api/bookings/create", middleware.AuthMiddleware(cfg.JWTSecret)(authMux))
 	mux.Handle("/api/bookings/cancel", middleware.AuthMiddleware(cfg.JWTSecret)(authMux))
+
+	mux.HandleFunc("/ws", hub.HandleWebSocket)
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
 	log.Info().Str("port", port).Msg("Listening")

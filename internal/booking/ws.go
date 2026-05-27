@@ -1,9 +1,14 @@
 package booking
 
 import (
+	"context"
+	"encoding/json"
 	"net/http"
 	"sync"
+	"time"
 
+	"github.com/MaXonchik07/gym-backend/internal/models"
+	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 )
@@ -16,12 +21,14 @@ type Hub struct {
 	mu      sync.RWMutex
 	clients map[*websocket.Conn]bool
 	logger  zerolog.Logger
+	msgRepo MessageRepository
 }
 
-func NewHub(logger zerolog.Logger) *Hub {
+func NewHub(logger zerolog.Logger, msgRepo MessageRepository) *Hub {
 	return &Hub{
 		clients: make(map[*websocket.Conn]bool),
 		logger:  logger,
+		msgRepo: msgRepo,
 	}
 }
 
@@ -35,6 +42,10 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 	h.clients[conn] = true
 	h.mu.Unlock()
 
+	msgs, _ := h.msgRepo.GetRecentMessages(context.Background(), 50)
+	history, _ := json.Marshal(msgs)
+	conn.WriteMessage(websocket.TextMessage, history)
+
 	go func() {
 		defer func() {
 			conn.Close()
@@ -43,10 +54,22 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 			h.mu.Unlock()
 		}()
 		for {
-			_, _, err := conn.ReadMessage()
+			_, message, err := conn.ReadMessage()
 			if err != nil {
 				break
 			}
+			var msg models.Message
+			if err := json.Unmarshal(message, &msg); err != nil {
+				continue
+			}
+			msg.ID = uuid.New().String()
+			msg.CreatedAt = time.Now()
+			if err := h.msgRepo.SaveMessage(context.Background(), &msg); err != nil {
+				h.logger.Error().Err(err).Msg("failed to save message")
+				continue
+			}
+			broadcast, _ := json.Marshal(msg)
+			h.Broadcast(broadcast)
 		}
 	}()
 }

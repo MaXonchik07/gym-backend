@@ -36,10 +36,10 @@ func newTestHub() *Hub {
 	return &Hub{
 		clients: make(map[*websocket.Conn]bool),
 		logger:  zerolog.Nop(),
+		msgRepo: nil, 
 	}
 }
 
-// Тесты
 func TestHandler_BookClass(t *testing.T) {
 	svc := &mockBookingService{
 		bookFn: func(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error) {
@@ -131,5 +131,17 @@ func TestHandler_GetBookings_Empty(t *testing.T) {
 	json.NewDecoder(rec.Body).Decode(&bookings)
 	if len(bookings) != 0 {
 		t.Errorf("expected 0 bookings, got %d", len(bookings))
+	}
+}
+func TestHandler_WebSocketConnection(t *testing.T) {
+	hub := newTestHub()
+	_ = NewHandler(nil, zerolog.Nop(), hub)
+
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	rec := httptest.NewRecorder()
+
+	hub.HandleWebSocket(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rec.Code)
 	}
 }
