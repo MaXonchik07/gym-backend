@@ -25,7 +25,7 @@ func (r *messageRepo) SaveMessage(ctx context.Context, msg *models.Message) erro
 }
 
 func (r *messageRepo) GetRecentMessages(ctx context.Context, limit int) ([]models.Message, error) {
-	query := `SELECT id, sender_id, content, created_at FROM messages ORDER BY created_at DESC LIMIT $1`
+	query := `SELECT id, sender_id, content, created_at FROM messages ORDER BY created_at ASC LIMIT $1`
 	rows, err := r.pool.Query(ctx, query, limit)
 	if err != nil {
 		return nil, err
