@@ -4,13 +4,13 @@ import (
 	"context"
 	"net/http"
 
+	_ "github.com/MaXonchik07/gym-backend/docs/booking"
 	"github.com/MaXonchik07/gym-backend/internal/booking"
 	"github.com/MaXonchik07/gym-backend/internal/common"
 	"github.com/MaXonchik07/gym-backend/pkg/db"
 	"github.com/MaXonchik07/gym-backend/pkg/logger"
 	"github.com/MaXonchik07/gym-backend/pkg/middleware"
 	"github.com/swaggo/http-swagger"
-	_ "github.com/MaXonchik07/gym-backend/docs/booking"
 )
 
 func main() {
@@ -44,8 +44,18 @@ func main() {
 	mux.HandleFunc("/ws", hub.HandleWebSocket)
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
+	handlerWithCSP := corsMiddleware(mux)
+
 	log.Info().Str("port", port).Msg("Listening")
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	if err := http.ListenAndServe(":"+port, handlerWithCSP); err != nil {
 		log.Fatal().Err(err).Msg("Server failed")
 	}
+}
+
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Security-Policy", "connect-src 'self' ws://localhost:8081 http://localhost:3000;")
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		next.ServeHTTP(w, r)
+	})
 }
