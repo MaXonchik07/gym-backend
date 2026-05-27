@@ -13,6 +13,19 @@ import (
 	"github.com/swaggo/http-swagger"
 )
 
+func corsMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
+		if r.Method == "OPTIONS" {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	cfg := common.LoadConfig()
 	log := logger.NewLogger(cfg.LogLevel)
@@ -44,18 +57,10 @@ func main() {
 	mux.HandleFunc("/ws", hub.HandleWebSocket)
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
-	handlerWithCSP := corsMiddleware(mux)
+	handlerWithCORS := corsMiddleware(mux)
 
 	log.Info().Str("port", port).Msg("Listening")
-	if err := http.ListenAndServe(":"+port, handlerWithCSP); err != nil {
+	if err := http.ListenAndServe(":"+port, handlerWithCORS); err != nil {
 		log.Fatal().Err(err).Msg("Server failed")
 	}
-}
-
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Security-Policy", "connect-src 'self' ws://localhost:8081 http://localhost:3000;")
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		next.ServeHTTP(w, r)
-	})
 }

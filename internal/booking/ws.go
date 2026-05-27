@@ -56,19 +56,26 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		for {
 			_, message, err := conn.ReadMessage()
 			if err != nil {
+				h.logger.Error().Err(err).Msg("read error")
 				break
 			}
+			h.logger.Info().Str("message", string(message)).Msg("received message")
+
 			var msg models.Message
 			if err := json.Unmarshal(message, &msg); err != nil {
+				h.logger.Error().Err(err).Msg("unmarshal error")
 				continue
 			}
+
 			msg.ID = uuid.New().String()
 			msg.CreatedAt = time.Now()
+
 			if err := h.msgRepo.SaveMessage(context.Background(), &msg); err != nil {
 				h.logger.Error().Err(err).Msg("failed to save message")
-				continue
 			}
+
 			broadcast, _ := json.Marshal(msg)
+			h.logger.Info().Str("broadcast", string(broadcast)).Msg("broadcasting")
 			h.Broadcast(broadcast)
 		}
 	}()
