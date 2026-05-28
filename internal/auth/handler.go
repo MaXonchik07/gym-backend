@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
-
 	"github.com/MaXonchik07/gym-backend/pkg/middleware"
 	"github.com/rs/zerolog"
 )
@@ -37,17 +36,17 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !strings.Contains(req.Email, "@") || !strings.Contains(req.Email, ".") {
-		http.Error(w, "некорректный email", http.StatusBadRequest)
+		http.Error(w, "Некорректный email", http.StatusBadRequest)
 		return
 	}
-	if len(req.Phone) < 10 {
-		http.Error(w, "телефон должен содержать не менее 10 символов", http.StatusBadRequest)
+	if len(req.Phone) < 11 {
+		http.Error(w, "Телефон должен содержать не менее 11 цифр", http.StatusBadRequest)
 		return
 	}
 
 	user, err := h.service.Register(r.Context(), &req)
 	if err != nil {
-		if err.Error() == "пользователь с таким email уже существует" {
+		if err.Error() == "Пользователь с таким email уже существует" {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}

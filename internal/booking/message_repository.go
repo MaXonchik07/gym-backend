@@ -9,6 +9,7 @@ import (
 type MessageRepository interface {
 	SaveMessage(ctx context.Context, msg *models.Message) error
 	GetRecentMessagesForUser(ctx context.Context, userID string, limit int) ([]models.Message, error)
+	GetChatUsers(ctx context.Context) ([]string, error)
 }
 
 type messageRepo struct {
@@ -45,4 +46,23 @@ func (r *messageRepo) GetRecentMessagesForUser(ctx context.Context, userID strin
 		messages = append(messages, m)
 	}
 	return messages, rows.Err()
+}
+
+func (r *messageRepo) GetChatUsers(ctx context.Context) ([]string, error) {
+	query := `SELECT DISTINCT sender_id FROM messages WHERE recipient_id = 'support'`
+	rows, err := r.pool.Query(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []string
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, err
+		}
+		users = append(users, userID)
+	}
+	return users, rows.Err()
 }

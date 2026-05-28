@@ -9,17 +9,33 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gorilla/websocket"
-	"github.com/rs/zerolog"
 	"github.com/MaXonchik07/gym-backend/internal/models"
 	"github.com/MaXonchik07/gym-backend/pkg/jwt"
 	"github.com/MaXonchik07/gym-backend/pkg/middleware"
+	"github.com/gorilla/websocket"
+	"github.com/rs/zerolog"
 )
 
 type mockBookingService struct {
-	bookFn   func(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error)
-	getFn    func(ctx context.Context, userID string) ([]models.Booking, error)
-	cancelFn func(ctx context.Context, bookingID, userID string) error
+	bookFn               func(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error)
+	getFn                func(ctx context.Context, userID string) ([]models.Booking, error)
+	cancelFn             func(ctx context.Context, bookingID, userID string) error
+	getChatUsersFn       func(ctx context.Context) ([]string, error)
+	getMessagesForUserFn func(ctx context.Context, userID string) ([]models.Message, error)
+}
+
+func (m *mockBookingService) GetChatUsers(ctx context.Context) ([]string, error) {
+	if m.getChatUsersFn != nil {
+		return m.getChatUsersFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *mockBookingService) GetMessagesForUser(ctx context.Context, userID string) ([]models.Message, error) {
+	if m.getMessagesForUserFn != nil {
+		return m.getMessagesForUserFn(ctx, userID)
+	}
+	return nil, nil
 }
 
 func (m *mockBookingService) BookClass(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error) {

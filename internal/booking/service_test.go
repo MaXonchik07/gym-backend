@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+type mockMessageRepo struct{}
+
 type mockRepo struct {
 	bookings        []models.Booking
 	createErr       error
@@ -17,6 +19,14 @@ type mockRepo struct {
 	isBookedResult  bool
 	countBookingsFn func(ctx context.Context, classID, date, time string) (int, error)
 }
+
+func (m *mockMessageRepo) SaveMessage(ctx context.Context, msg *models.Message) error { return nil }
+
+func (m *mockMessageRepo) GetRecentMessagesForUser(ctx context.Context, userID string, limit int) ([]models.Message, error) {
+	return nil, nil
+}
+
+func (m *mockMessageRepo) GetChatUsers(ctx context.Context) ([]string, error) { return nil, nil }
 
 func (m *mockRepo) CountBookingsForSlot(ctx context.Context, classID, date, time string) (int, error) {
 	if m.countBookingsFn != nil {
@@ -70,7 +80,7 @@ func (m *mockRepo) IsAlreadyBooked(ctx context.Context, userID, classID, date, t
 
 func TestBookClass_Success(t *testing.T) {
 	repo := &mockRepo{}
-	svc := NewService(repo)
+	svc := NewService(repo, &mockMessageRepo{})
 	req := &BookRequest{
 		ClassID:    "yoga",
 		ClassName:  "Yoga Flow",
@@ -91,7 +101,7 @@ func TestBookClass_AlreadyBooked(t *testing.T) {
 	repo := &mockRepo{
 		isBookedResult: true,
 	}
-	svc := NewService(repo)
+	svc := NewService(repo, &mockMessageRepo{})
 	req := &BookRequest{
 		ClassID: "yoga",
 		Date:    "2026-06-01",
@@ -113,7 +123,7 @@ func TestGetUserBookings(t *testing.T) {
 			{ID: "2", UserID: "user2", ClassName: "Boxing"},
 		},
 	}
-	svc := NewService(repo)
+	svc := NewService(repo, &mockMessageRepo{})
 	bookings, err := svc.GetUserBookings(context.Background(), "user1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -132,7 +142,7 @@ func TestCancelBooking(t *testing.T) {
 			{ID: "1", UserID: "user1"},
 		},
 	}
-	svc := NewService(repo)
+	svc := NewService(repo, &mockMessageRepo{})
 	err := svc.CancelBooking(context.Background(), "1", "user1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -147,7 +157,7 @@ func TestCancelBooking_NotFound(t *testing.T) {
 			{ID: "1", UserID: "user1"},
 		},
 	}
-	svc := NewService(repo)
+	svc := NewService(repo, &mockMessageRepo{})
 	err := svc.CancelBooking(context.Background(), "non-existent", "user1")
 	if err == nil {
 		t.Error("expected error, got nil")
@@ -159,7 +169,7 @@ func TestCancelBooking_NotFound(t *testing.T) {
 
 func TestBookClass_AfterCancel(t *testing.T) {
 	repo := &mockRepo{}
-	svc := NewService(repo)
+	svc := NewService(repo, &mockMessageRepo{})
 	req := &BookRequest{
 		ClassID:    "yoga",
 		ClassName:  "Yoga",

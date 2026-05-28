@@ -11,14 +11,17 @@ type Service interface {
 	BookClass(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error)
 	GetUserBookings(ctx context.Context, userID string) ([]models.Booking, error)
 	CancelBooking(ctx context.Context, bookingID, userID string) error
+	GetChatUsers(ctx context.Context) ([]string, error)
+	GetMessagesForUser(ctx context.Context, userID string) ([]models.Message, error)
 }
 
 type service struct {
-	repo Repository
+	repo    Repository
+	msgRepo MessageRepository
 }
 
-func NewService(repo Repository) Service {
-	return &service{repo: repo}
+func NewService(repo Repository, msgRepo MessageRepository) Service {
+	return &service{repo: repo, msgRepo: msgRepo}
 }
 
 func (s *service) BookClass(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error) {
@@ -58,6 +61,14 @@ func (s *service) GetUserBookings(ctx context.Context, userID string) ([]models.
 
 func (s *service) CancelBooking(ctx context.Context, bookingID, userID string) error {
 	return s.repo.CancelBooking(ctx, bookingID, userID)
+}
+
+func (s *service) GetChatUsers(ctx context.Context) ([]string, error) {
+	return s.msgRepo.GetChatUsers(ctx)
+}
+
+func (s *service) GetMessagesForUser(ctx context.Context, userID string) ([]models.Message, error) {
+	return s.msgRepo.GetRecentMessagesForUser(ctx, userID, 50)
 }
 
 type BookRequest struct {

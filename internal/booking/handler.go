@@ -12,7 +12,7 @@ import (
 type Handler struct {
 	service Service
 	logger  zerolog.Logger
-	hub *Hub
+	hub     *Hub
 }
 
 func NewHandler(service Service, logger zerolog.Logger, hub *Hub) *Handler {
@@ -47,11 +47,11 @@ func (h *Handler) BookClass(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusConflict)
 		return
 	}
-		msg, _ := json.Marshal(map[string]interface{}{
+	msg, _ := json.Marshal(map[string]interface{}{
 		"type":    "new_booking",
 		"booking": booking,
 	})
-	
+
 	h.hub.Broadcast(msg)
 	w.WriteHeader(http.StatusCreated)
 	json.NewEncoder(w).Encode(booking)
@@ -116,3 +116,37 @@ func (h *Hub) Broadcast(message []byte) {
 	}
 }
 
+func (h *Handler) GetChatUsers(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetUserClaims(r.Context())
+	if !ok || claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	users, err := h.service.GetChatUsers(r.Context())
+	if err != nil {
+		h.logger.Error().Err(err).Msg("get chat users failed")
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(users)
+}
+
+func (h *Handler) GetChatHistory(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetUserClaims(r.Context())
+	if !ok || claims.Role != "admin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	userID := r.URL.Query().Get("user_id")
+	if userID == "" {
+		http.Error(w, "user_id required", http.StatusBadRequest)
+		return
+	}
+	msgs, err := h.service.GetMessagesForUser(r.Context(), userID)
+	if err != nil {
+		h.logger.Error().Err(err).Msg("get chat history failed")
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(msgs)
+}

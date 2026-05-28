@@ -42,7 +42,7 @@ func main() {
 	msgRepo := booking.NewMessageRepository(pool)
 	hub := booking.NewHub(log, msgRepo)
 	repo := booking.NewRepository(pool)
-	svc := booking.NewService(repo)
+	svc := booking.NewService(repo, msgRepo)
 	handler := booking.NewHandler(svc, log, hub)
 
 	mux := http.NewServeMux()
@@ -53,7 +53,8 @@ func main() {
 	mux.Handle("/api/bookings", middleware.AuthMiddleware(cfg.JWTSecret)(authMux))
 	mux.Handle("/api/bookings/create", middleware.AuthMiddleware(cfg.JWTSecret)(authMux))
 	mux.Handle("/api/bookings/cancel", middleware.AuthMiddleware(cfg.JWTSecret)(authMux))
-
+	mux.Handle("/api/admin/chat-users", middleware.AuthMiddleware(cfg.JWTSecret)(http.HandlerFunc(handler.GetChatUsers)))
+	mux.Handle("/api/admin/chat-history", middleware.AuthMiddleware(cfg.JWTSecret)(http.HandlerFunc(handler.GetChatHistory)))
 	mux.HandleFunc("/ws", hub.HandleWebSocket)
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 
