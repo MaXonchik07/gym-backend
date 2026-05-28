@@ -3,18 +3,26 @@ package booking
 import (
 	"context"
 	"errors"
+	"github.com/MaXonchik07/gym-backend/internal/models"
 	"testing"
 	"time"
-	"github.com/MaXonchik07/gym-backend/internal/models"
 )
 
 type mockRepo struct {
-	bookings       []models.Booking
-	createErr      error
-	getErr         error
-	cancelErr      error
-	isBookedErr    error
-	isBookedResult bool
+	bookings        []models.Booking
+	createErr       error
+	getErr          error
+	cancelErr       error
+	isBookedErr     error
+	isBookedResult  bool
+	countBookingsFn func(ctx context.Context, classID, date, time string) (int, error)
+}
+
+func (m *mockRepo) CountBookingsForSlot(ctx context.Context, classID, date, time string) (int, error) {
+	if m.countBookingsFn != nil {
+		return m.countBookingsFn(ctx, classID, date, time)
+	}
+	return 0, nil
 }
 
 func (m *mockRepo) CreateBooking(ctx context.Context, b *models.Booking) error {
@@ -134,45 +142,45 @@ func TestCancelBooking(t *testing.T) {
 	}
 }
 func TestCancelBooking_NotFound(t *testing.T) {
-    repo := &mockRepo{
-        bookings: []models.Booking{
-            {ID: "1", UserID: "user1"},
-        },
-    }
-    svc := NewService(repo)
-    err := svc.CancelBooking(context.Background(), "non-existent", "user1")
-    if err == nil {
-        t.Error("expected error, got nil")
-    }
-    if err.Error() != "not found" {
-        t.Errorf("expected 'not found', got %v", err)
-    }
+	repo := &mockRepo{
+		bookings: []models.Booking{
+			{ID: "1", UserID: "user1"},
+		},
+	}
+	svc := NewService(repo)
+	err := svc.CancelBooking(context.Background(), "non-existent", "user1")
+	if err == nil {
+		t.Error("expected error, got nil")
+	}
+	if err.Error() != "not found" {
+		t.Errorf("expected 'not found', got %v", err)
+	}
 }
 
 func TestBookClass_AfterCancel(t *testing.T) {
-    repo := &mockRepo{}
-    svc := NewService(repo)
-    req := &BookRequest{
-        ClassID:    "yoga",
-        ClassName:  "Yoga",
-        Instructor: "Anna",
-        Date:       "2026-06-01",
-        Time:       "07:00",
-    }
-    booking, err := svc.BookClass(context.Background(), "user1", req)
-    if err != nil {
-        t.Fatalf("first booking failed: %v", err)
-    }
-    err = svc.CancelBooking(context.Background(), booking.ID, "user1")
-    if err != nil {
-        t.Fatalf("cancel failed: %v", err)
-    }
-    repo.isBookedResult = false
-    booking2, err := svc.BookClass(context.Background(), "user1", req)
-    if err != nil {
-        t.Fatalf("second booking after cancel failed: %v", err)
-    }
-    if booking2.ID == "" {
-        t.Error("expected new booking ID")
-    }
+	repo := &mockRepo{}
+	svc := NewService(repo)
+	req := &BookRequest{
+		ClassID:    "yoga",
+		ClassName:  "Yoga",
+		Instructor: "Anna",
+		Date:       "2026-06-01",
+		Time:       "07:00",
+	}
+	booking, err := svc.BookClass(context.Background(), "user1", req)
+	if err != nil {
+		t.Fatalf("first booking failed: %v", err)
+	}
+	err = svc.CancelBooking(context.Background(), booking.ID, "user1")
+	if err != nil {
+		t.Fatalf("cancel failed: %v", err)
+	}
+	repo.isBookedResult = false
+	booking2, err := svc.BookClass(context.Background(), "user1", req)
+	if err != nil {
+		t.Fatalf("second booking after cancel failed: %v", err)
+	}
+	if booking2.ID == "" {
+		t.Error("expected new booking ID")
+	}
 }

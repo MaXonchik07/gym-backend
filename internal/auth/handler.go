@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/MaXonchik07/gym-backend/pkg/middleware"
 	"github.com/rs/zerolog"
 )
 
@@ -81,4 +82,58 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	json.NewEncoder(w).Encode(map[string]string{"token": token})
+}
+
+func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetUserClaims(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	user, err := h.service.GetUserByID(r.Context(), claims.UserID)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(user)
+}
+
+func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetUserClaims(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req UpdateProfileRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	user, err := h.service.UpdateProfile(r.Context(), claims.UserID, &req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(user)
+}
+
+func (h *Handler) UpdateMembership(w http.ResponseWriter, r *http.Request) {
+	claims, ok := middleware.GetUserClaims(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req struct {
+		MembershipType string `json:"membership_type"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request", http.StatusBadRequest)
+		return
+	}
+	user, err := h.service.UpdateProfile(r.Context(), claims.UserID, &UpdateProfileRequest{MembershipType: req.MembershipType})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(user)
 }

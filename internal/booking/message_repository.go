@@ -8,7 +8,7 @@ import (
 
 type MessageRepository interface {
 	SaveMessage(ctx context.Context, msg *models.Message) error
-	GetRecentMessages(ctx context.Context, limit int) ([]models.Message, error)
+	GetRecentMessagesForUser(ctx context.Context, userID string, limit int) ([]models.Message, error)
 }
 
 type messageRepo struct {
@@ -20,13 +20,17 @@ func NewMessageRepository(pool DBPool) MessageRepository {
 }
 
 func (r *messageRepo) SaveMessage(ctx context.Context, msg *models.Message) error {
-	query := `INSERT INTO messages (sender_id, content) VALUES ($1, $2) RETURNING id, created_at`
-	return r.pool.QueryRow(ctx, query, msg.SenderID, msg.Content).Scan(&msg.ID, &msg.CreatedAt)
+	query := `INSERT INTO messages (sender_id, recipient_id, content) VALUES ($1, $2, $3) RETURNING id, created_at`
+	return r.pool.QueryRow(ctx, query, msg.SenderID, msg.RecipientID, msg.Content).Scan(&msg.ID, &msg.CreatedAt)
 }
 
-func (r *messageRepo) GetRecentMessages(ctx context.Context, limit int) ([]models.Message, error) {
-	query := `SELECT id, sender_id, content, created_at FROM messages ORDER BY created_at ASC LIMIT $1`
-	rows, err := r.pool.Query(ctx, query, limit)
+func (r *messageRepo) GetRecentMessagesForUser(ctx context.Context, userID string, limit int) ([]models.Message, error) {
+	query := `
+		SELECT id, sender_id, COALESCE(recipient_id, ''), content, created_at
+		FROM messages
+		WHERE sender_id = $1 OR recipient_id = $1
+		ORDER BY created_at ASC LIMIT $2`
+	rows, err := r.pool.Query(ctx, query, userID, limit)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +39,7 @@ func (r *messageRepo) GetRecentMessages(ctx context.Context, limit int) ([]model
 	var messages []models.Message
 	for rows.Next() {
 		var m models.Message
-		if err := rows.Scan(&m.ID, &m.SenderID, &m.Content, &m.CreatedAt); err != nil {
+		if err := rows.Scan(&m.ID, &m.SenderID, &m.RecipientID, &m.Content, &m.CreatedAt); err != nil {
 			return nil, err
 		}
 		messages = append(messages, m)

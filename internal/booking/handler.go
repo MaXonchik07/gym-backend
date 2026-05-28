@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/MaXonchik07/gym-backend/pkg/middleware"
-
+	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 )
 
@@ -107,3 +107,12 @@ func (h *Handler) CancelBooking(w http.ResponseWriter, r *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func (h *Hub) Broadcast(message []byte) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	for conn := range h.clients {
+		conn.WriteMessage(websocket.TextMessage, message)
+	}
+}
+

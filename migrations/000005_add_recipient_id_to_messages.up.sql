@@ -1,0 +1,1 @@
+ALTER TABLE messages ADD COLUMN recipient_id VARCHAR(255);

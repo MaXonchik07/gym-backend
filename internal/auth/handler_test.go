@@ -17,6 +17,7 @@ type mockService struct {
 	registerFn func(ctx context.Context, req *RegisterRequest) (*models.User, error)
 	loginFn    func(ctx context.Context, req *LoginRequest) (string, error)
 	updateFn   func(ctx context.Context, userID string, req *UpdateProfileRequest) (*models.User, error)
+	getUserFn  func(ctx context.Context, id string) (*models.User, error)
 }
 
 func (m *mockService) Register(ctx context.Context, req *RegisterRequest) (*models.User, error) {
@@ -111,4 +112,11 @@ func TestHandler_Register_Duplicate(t *testing.T) {
     if rec.Code != http.StatusConflict {
         t.Errorf("expected 409, got %d", rec.Code)
     }
+}
+
+func (m *mockService) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+    if m.getUserFn != nil {
+        return m.getUserFn(ctx, id)
+    }
+    return nil, nil
 }

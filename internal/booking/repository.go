@@ -12,6 +12,7 @@ type Repository interface {
 	GetBookingsByUser(ctx context.Context, userID string) ([]models.Booking, error)
 	CancelBooking(ctx context.Context, bookingID, userID string) error
 	IsAlreadyBooked(ctx context.Context, userID, classID, date, time string) (bool, error)
+	CountBookingsForSlot(ctx context.Context, classID, date, time string) (int, error)
 }
 
 type DBPool interface {
@@ -74,4 +75,11 @@ func (r *repository) IsAlreadyBooked(ctx context.Context, userID, classID, date,
 	var exists bool
 	err := r.pool.QueryRow(ctx, query, userID, classID, date, time).Scan(&exists)
 	return exists, err
+}
+
+func (r *repository) CountBookingsForSlot(ctx context.Context, classID, date, time string) (int, error) {
+    query := `SELECT COUNT(*) FROM bookings WHERE class_id = $1 AND date = $2 AND time = $3`
+    var count int
+    err := r.pool.QueryRow(ctx, query, classID, date, time).Scan(&count)
+    return count, err
 }

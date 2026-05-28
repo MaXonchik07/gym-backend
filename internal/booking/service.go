@@ -27,7 +27,15 @@ func (s *service) BookClass(ctx context.Context, userID string, req *BookRequest
 		return nil, err
 	}
 	if exists {
-		return nil, errors.New("вы уже записаны на это занятие")
+		return nil, errors.New("Вы уже записаны на это занятие")
+	}
+
+	current, err := s.repo.CountBookingsForSlot(ctx, req.ClassID, req.Date, req.Time)
+	if err != nil {
+		return nil, err
+	}
+	if req.Capacity > 0 && current >= req.Capacity {
+		return nil, errors.New("Нет доступных мест")
 	}
 
 	booking := &models.Booking{
@@ -58,4 +66,5 @@ type BookRequest struct {
 	Instructor string `json:"instructor"`
 	Date       string `json:"date"`
 	Time       string `json:"time"`
+	Capacity   int    `json:"capacity"`
 }

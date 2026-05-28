@@ -233,3 +233,15 @@ func TestUpdateProfile_UserNotFound(t *testing.T) {
         t.Error("expected error, got nil")
     }
 }
+
+func (m *mockRepo) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+    if m.users == nil {
+        return nil, nil
+    }
+    for _, u := range m.users {
+        if u.ID == id {
+            return u, nil
+        }
+    }
+    return nil, nil
+}

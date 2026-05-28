@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pashagolub/pgxmock/v2"
 	"github.com/MaXonchik07/gym-backend/internal/models"
+	"github.com/pashagolub/pgxmock/v2"
 )
 
 func TestSaveMessage(t *testing.T) {
@@ -17,16 +17,17 @@ func TestSaveMessage(t *testing.T) {
 	defer mock.Close()
 
 	repo := NewMessageRepository(mock)
+	msg := &models.Message{
+		SenderID:    "user-1",
+		RecipientID: "support",
+		Content:     "Hello",
+	}
 
 	mock.ExpectQuery(`INSERT INTO messages`).
-		WithArgs("user-1", "Hello").
+		WithArgs("user-1", "support", "Hello").
 		WillReturnRows(pgxmock.NewRows([]string{"id", "created_at"}).
 			AddRow("msg-1", time.Now()))
 
-	msg := &models.Message{
-		SenderID: "user-1",
-		Content:  "Hello",
-	}
 	err = repo.SaveMessage(context.Background(), msg)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -36,7 +37,7 @@ func TestSaveMessage(t *testing.T) {
 	}
 }
 
-func TestGetRecentMessages(t *testing.T) {
+func TestGetRecentMessagesForUser(t *testing.T) {
 	mock, err := pgxmock.NewPool()
 	if err != nil {
 		t.Fatal(err)
@@ -44,14 +45,16 @@ func TestGetRecentMessages(t *testing.T) {
 	defer mock.Close()
 
 	repo := NewMessageRepository(mock)
+	userID := "user-1"
+	limit := 10
 
-	mock.ExpectQuery(`SELECT (.+) FROM messages`).
-		WithArgs(10).
-		WillReturnRows(pgxmock.NewRows([]string{"id", "sender_id", "content", "created_at"}).
-			AddRow("m1", "user-1", "Hi", time.Now()).
-			AddRow("m2", "user-2", "Hello", time.Now()))
+	mock.ExpectQuery(`SELECT (.+) FROM messages WHERE sender_id = \$1 OR recipient_id = \$1 ORDER BY created_at ASC LIMIT \$2`).
+		WithArgs(userID, limit).
+		WillReturnRows(pgxmock.NewRows([]string{"id", "sender_id", "recipient_id", "content", "created_at"}).
+			AddRow("m1", "user-1", "support", "Hi", time.Now()).
+			AddRow("m2", "support", "user-1", "Hello", time.Now()))
 
-	msgs, err := repo.GetRecentMessages(context.Background(), 10)
+	msgs, err := repo.GetRecentMessagesForUser(context.Background(), userID, limit)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

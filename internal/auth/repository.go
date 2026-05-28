@@ -12,6 +12,7 @@ type Repository interface {
 	CreateUser(ctx context.Context, user *models.User) error
 	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
 	UpdateUser(ctx context.Context, user *models.User) error
+	GetUserByID(ctx context.Context, id string) (*models.User, error)
 }
 
 type repository struct {
@@ -50,11 +51,27 @@ func (r *repository) GetUserByEmail(ctx context.Context, email string) (*models.
 	return user, err
 }
 
+func (r *repository) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+	query := `SELECT id, first_name, last_name, email, phone, password_hash, role, membership_type, join_date, created_at, updated_at
+              FROM users WHERE id = $1`
+	row := r.pool.QueryRow(ctx, query, id)
+	user := &models.User{}
+	err := row.Scan(
+		&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Phone,
+		&user.PasswordHash, &user.Role, &user.MembershipType,
+		&user.JoinDate, &user.CreatedAt, &user.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 func (r *repository) UpdateUser(ctx context.Context, user *models.User) error {
 	query := `
-		UPDATE users SET first_name=$1, last_name=$2, phone=$3, membership_type=$4, updated_at=NOW()
-		WHERE id=$5
-	`
-	_, err := r.pool.Exec(ctx, query, user.FirstName, user.LastName, user.Phone, user.MembershipType, user.ID)
+        UPDATE users SET first_name=$1, last_name=$2, email=$3, phone=$4, membership_type=$5, updated_at=NOW()
+        WHERE id=$6
+    `
+	_, err := r.pool.Exec(ctx, query, user.FirstName, user.LastName, user.Email, user.Phone, user.MembershipType, user.ID)
 	return err
 }

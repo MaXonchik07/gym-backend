@@ -34,9 +34,9 @@ func (m *mockBookingService) CancelBooking(ctx context.Context, bookingID, userI
 
 func newTestHub() *Hub {
 	return &Hub{
-		clients: make(map[*websocket.Conn]bool),
+		clients: make(map[*websocket.Conn]string),
 		logger:  zerolog.Nop(),
-		msgRepo: nil, 
+		msgRepo: nil,
 	}
 }
 
