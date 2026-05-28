@@ -58,10 +58,10 @@ func (s *service) Login(ctx context.Context, req *LoginRequest) (string, error) 
 		return "", err
 	}
 	if user == nil {
-		return "", errors.New("Пользователь не найден")
+		return "", errors.New("пользователь не найден")
 	}
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		return "", errors.New("Неверный пароль")
+		return "", errors.New("неверный пароль")
 	}
 	return jwt.GenerateToken(user.ID, user.Email, user.Role, s.jwtSecret)
 }
@@ -72,12 +72,12 @@ func (s *service) UpdateProfile(ctx context.Context, userID string, req *UpdateP
 		return nil, err
 	}
 	if user == nil {
-		return nil, errors.New("Пользователь не найден")
+		return nil, errors.New("пользователь не найден")
 	}
 	if req.Email != "" && req.Email != user.Email {
 		existing, _ := s.repo.GetUserByEmail(ctx, req.Email)
 		if existing != nil && existing.ID != userID {
-			return nil, errors.New("Email уже используется")
+			return nil, errors.New("email уже используется")
 		}
 		user.Email = req.Email
 	}

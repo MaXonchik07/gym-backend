@@ -2,15 +2,20 @@ package auth
 
 import (
 	"encoding/json"
-	"net/http"
-	"strings"
 	"github.com/MaXonchik07/gym-backend/pkg/middleware"
 	"github.com/rs/zerolog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 )
 
 type Handler struct {
 	service Service
 	logger  zerolog.Logger
+}
+
+func (h *Handler) GetUserByID(rec *httptest.ResponseRecorder, req *http.Request) {
+	panic("unimplemented")
 }
 
 func NewHandler(service Service, logger zerolog.Logger) *Handler {
@@ -31,22 +36,22 @@ func NewHandler(service Service, logger zerolog.Logger) *Handler {
 func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	var req RegisterRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "invalid request", http.StatusBadRequest)
+		http.Error(w, "неверный JSON", http.StatusBadRequest)
 		return
 	}
 
 	if !strings.Contains(req.Email, "@") || !strings.Contains(req.Email, ".") {
-		http.Error(w, "Некорректный email", http.StatusBadRequest)
+		http.Error(w, "некорректный email", http.StatusBadRequest)
 		return
 	}
-	if len(req.Phone) < 11 {
-		http.Error(w, "Телефон должен содержать не менее 11 цифр", http.StatusBadRequest)
+	if len(req.Phone) < 10 {
+		http.Error(w, "телефон должен содержать не менее 10 символов", http.StatusBadRequest)
 		return
 	}
 
 	user, err := h.service.Register(r.Context(), &req)
 	if err != nil {
-		if err.Error() == "Пользователь с таким email уже существует" {
+		if err.Error() == "пользователь с таким email уже существует" {
 			http.Error(w, err.Error(), http.StatusConflict)
 			return
 		}

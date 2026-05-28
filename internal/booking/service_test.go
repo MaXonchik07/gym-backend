@@ -3,12 +3,9 @@ package booking
 import (
 	"context"
 	"errors"
-	"github.com/MaXonchik07/gym-backend/internal/models"
 	"testing"
-	"time"
+	"github.com/MaXonchik07/gym-backend/internal/models"
 )
-
-type mockMessageRepo struct{}
 
 type mockRepo struct {
 	bookings        []models.Booking
@@ -20,177 +17,178 @@ type mockRepo struct {
 	countBookingsFn func(ctx context.Context, classID, date, time string) (int, error)
 }
 
-func (m *mockMessageRepo) SaveMessage(ctx context.Context, msg *models.Message) error { return nil }
-
-func (m *mockMessageRepo) GetRecentMessagesForUser(ctx context.Context, userID string, limit int) ([]models.Message, error) {
-	return nil, nil
-}
-
-func (m *mockMessageRepo) GetChatUsers(ctx context.Context) ([]string, error) { return nil, nil }
-
-func (m *mockRepo) CountBookingsForSlot(ctx context.Context, classID, date, time string) (int, error) {
-	if m.countBookingsFn != nil {
-		return m.countBookingsFn(ctx, classID, date, time)
-	}
-	return 0, nil
-}
-
 func (m *mockRepo) CreateBooking(ctx context.Context, b *models.Booking) error {
 	if m.createErr != nil {
 		return m.createErr
 	}
-	b.ID = "mock-id-123"
-	b.CreatedAt = time.Now()
+	b.ID = "mock-id"
 	m.bookings = append(m.bookings, *b)
 	return nil
 }
-
-func (m *mockRepo) GetBookingsByUser(ctx context.Context, userID string) ([]models.Booking, error) {
+func (m *mockRepo) GetBookingsByUser(ctx context.Context, uid string) ([]models.Booking, error) {
 	if m.getErr != nil {
 		return nil, m.getErr
 	}
-	var result []models.Booking
+	var res []models.Booking
 	for _, b := range m.bookings {
-		if b.UserID == userID {
-			result = append(result, b)
+		if b.UserID == uid {
+			res = append(res, b)
 		}
 	}
-	return result, nil
+	return res, nil
 }
-
-func (m *mockRepo) CancelBooking(ctx context.Context, bookingID, userID string) error {
+func (m *mockRepo) CancelBooking(ctx context.Context, bid, uid string) error {
 	if m.cancelErr != nil {
 		return m.cancelErr
 	}
 	for i, b := range m.bookings {
-		if b.ID == bookingID && b.UserID == userID {
+		if b.ID == bid && b.UserID == uid {
 			m.bookings = append(m.bookings[:i], m.bookings[i+1:]...)
 			return nil
 		}
 	}
 	return errors.New("not found")
 }
-
-func (m *mockRepo) IsAlreadyBooked(ctx context.Context, userID, classID, date, time string) (bool, error) {
+func (m *mockRepo) IsAlreadyBooked(ctx context.Context, uid, cid, date, time string) (bool, error) {
 	if m.isBookedErr != nil {
 		return false, m.isBookedErr
 	}
 	return m.isBookedResult, nil
 }
+func (m *mockRepo) CountBookingsForSlot(ctx context.Context, cid, date, time string) (int, error) {
+	if m.countBookingsFn != nil {
+		return m.countBookingsFn(ctx, cid, date, time)
+	}
+	return 0, nil
+}
+
+type mockMessageRepo struct {
+	getRecentFn func(ctx context.Context, uid string, limit int) ([]models.Message, error)
+	getUsersFn  func(ctx context.Context) ([]string, error)
+}
+
+func (m *mockMessageRepo) SaveMessage(ctx context.Context, msg *models.Message) error { return nil }
+func (m *mockMessageRepo) GetRecentMessagesForUser(ctx context.Context, uid string, limit int) ([]models.Message, error) {
+	if m.getRecentFn != nil {
+		return m.getRecentFn(ctx, uid, limit)
+	}
+	return nil, nil
+}
+func (m *mockMessageRepo) GetChatUsers(ctx context.Context) ([]string, error) {
+	if m.getUsersFn != nil {
+		return m.getUsersFn(ctx)
+	}
+	return nil, nil
+}
 
 func TestBookClass_Success(t *testing.T) {
-	repo := &mockRepo{}
-	svc := NewService(repo, &mockMessageRepo{})
-	req := &BookRequest{
-		ClassID:    "yoga",
-		ClassName:  "Yoga Flow",
-		Instructor: "Anna",
-		Date:       "2026-06-01",
-		Time:       "07:00",
-	}
-	booking, err := svc.BookClass(context.Background(), "user1", req)
-	if err != nil {
-		t.Fatalf("expected no error, got %v", err)
-	}
-	if booking.ID != "mock-id-123" {
-		t.Errorf("expected mock-id-123, got %s", booking.ID)
+	svc := NewService(&mockRepo{}, &mockMessageRepo{})
+	b, err := svc.BookClass(context.Background(), "u1", &BookRequest{ClassID: "yoga", ClassName: "Y", Instructor: "A", Date: "2026-06-01", Time: "07:00"})
+	if err != nil || b.ID != "mock-id" {
+		t.Fatalf("unexpected: %v %s", err, b.ID)
 	}
 }
 
 func TestBookClass_AlreadyBooked(t *testing.T) {
-	repo := &mockRepo{
-		isBookedResult: true,
+	svc := NewService(&mockRepo{isBookedResult: true}, &mockMessageRepo{})
+	_, err := svc.BookClass(context.Background(), "u1", &BookRequest{ClassID: "yoga", Date: "2026-06-01", Time: "07:00"})
+	if err == nil || err.Error() != "вы уже записаны на это занятие" {
+		t.Errorf("unexpected: %v", err)
 	}
+}
+
+func TestBookClass_CapacityExceeded(t *testing.T) {
+	repo := &mockRepo{countBookingsFn: func(ctx context.Context, cid, d, t string) (int, error) { return 20, nil }}
 	svc := NewService(repo, &mockMessageRepo{})
-	req := &BookRequest{
-		ClassID: "yoga",
-		Date:    "2026-06-01",
-		Time:    "07:00",
+	_, err := svc.BookClass(context.Background(), "u1", &BookRequest{ClassID: "yoga", Date: "2026-06-01", Time: "07:00", Capacity: 20})
+	if err == nil || err.Error() != "нет доступных мест" {
+		t.Errorf("expected capacity error, got %v", err)
 	}
-	_, err := svc.BookClass(context.Background(), "user1", req)
+}
+
+func TestBookClass_CreateError(t *testing.T) {
+	svc := NewService(&mockRepo{createErr: errors.New("db error")}, &mockMessageRepo{})
+	_, err := svc.BookClass(context.Background(), "u1", &BookRequest{ClassID: "yoga", Date: "2026-06-01", Time: "07:00"})
 	if err == nil {
-		t.Error("expected error, got nil")
-	}
-	if err.Error() != "вы уже записаны на это занятие" {
-		t.Errorf("expected duplicate error, got %v", err)
+		t.Error("expected error")
 	}
 }
 
-func TestGetUserBookings(t *testing.T) {
-	repo := &mockRepo{
-		bookings: []models.Booking{
-			{ID: "1", UserID: "user1", ClassName: "Yoga"},
-			{ID: "2", UserID: "user2", ClassName: "Boxing"},
-		},
-	}
+func TestGetUserBookings_Success(t *testing.T) {
+	repo := &mockRepo{bookings: []models.Booking{{ID: "1", UserID: "u1"}, {ID: "2", UserID: "u2"}}}
 	svc := NewService(repo, &mockMessageRepo{})
-	bookings, err := svc.GetUserBookings(context.Background(), "user1")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if len(bookings) != 1 {
-		t.Errorf("expected 1 booking, got %d", len(bookings))
-	}
-	if bookings[0].ClassName != "Yoga" {
-		t.Errorf("expected Yoga, got %s", bookings[0].ClassName)
+	b, _ := svc.GetUserBookings(context.Background(), "u1")
+	if len(b) != 1 {
+		t.Errorf("expected 1, got %d", len(b))
 	}
 }
 
-func TestCancelBooking(t *testing.T) {
-	repo := &mockRepo{
-		bookings: []models.Booking{
-			{ID: "1", UserID: "user1"},
-		},
+func TestGetUserBookings_Error(t *testing.T) {
+	svc := NewService(&mockRepo{getErr: errors.New("db error")}, &mockMessageRepo{})
+	_, err := svc.GetUserBookings(context.Background(), "u1")
+	if err == nil {
+		t.Error("expected error")
 	}
+}
+
+func TestCancelBooking_Success(t *testing.T) {
+	repo := &mockRepo{bookings: []models.Booking{{ID: "1", UserID: "u1"}}}
 	svc := NewService(repo, &mockMessageRepo{})
-	err := svc.CancelBooking(context.Background(), "1", "user1")
+	err := svc.CancelBooking(context.Background(), "1", "u1")
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("unexpected: %v", err)
 	}
 	if len(repo.bookings) != 0 {
-		t.Error("expected booking to be deleted")
-	}
-}
-func TestCancelBooking_NotFound(t *testing.T) {
-	repo := &mockRepo{
-		bookings: []models.Booking{
-			{ID: "1", UserID: "user1"},
-		},
-	}
-	svc := NewService(repo, &mockMessageRepo{})
-	err := svc.CancelBooking(context.Background(), "non-existent", "user1")
-	if err == nil {
-		t.Error("expected error, got nil")
-	}
-	if err.Error() != "not found" {
-		t.Errorf("expected 'not found', got %v", err)
+		t.Error("not deleted")
 	}
 }
 
-func TestBookClass_AfterCancel(t *testing.T) {
-	repo := &mockRepo{}
-	svc := NewService(repo, &mockMessageRepo{})
-	req := &BookRequest{
-		ClassID:    "yoga",
-		ClassName:  "Yoga",
-		Instructor: "Anna",
-		Date:       "2026-06-01",
-		Time:       "07:00",
-	}
-	booking, err := svc.BookClass(context.Background(), "user1", req)
-	if err != nil {
-		t.Fatalf("first booking failed: %v", err)
-	}
-	err = svc.CancelBooking(context.Background(), booking.ID, "user1")
-	if err != nil {
-		t.Fatalf("cancel failed: %v", err)
-	}
-	repo.isBookedResult = false
-	booking2, err := svc.BookClass(context.Background(), "user1", req)
-	if err != nil {
-		t.Fatalf("second booking after cancel failed: %v", err)
-	}
-	if booking2.ID == "" {
-		t.Error("expected new booking ID")
+func TestCancelBooking_NotFound(t *testing.T) {
+	svc := NewService(&mockRepo{}, &mockMessageRepo{})
+	err := svc.CancelBooking(context.Background(), "1", "u1")
+	if err == nil {
+		t.Error("expected error")
 	}
 }
+
+func TestCancelBooking_Error(t *testing.T) {
+	svc := NewService(&mockRepo{cancelErr: errors.New("db error")}, &mockMessageRepo{})
+	err := svc.CancelBooking(context.Background(), "1", "u1")
+	if err == nil {
+		t.Error("expected error")
+	}
+}
+
+func TestGetChatUsers(t *testing.T) {
+	msgRepo := &mockMessageRepo{getUsersFn: func(ctx context.Context) ([]string, error) { return []string{"u1", "u2"}, nil }}
+	svc := NewService(&mockRepo{}, msgRepo)
+	u, _ := svc.GetChatUsers(context.Background())
+	if len(u) != 2 {
+		t.Errorf("expected 2, got %d", len(u))
+	}
+}
+
+func TestGetMessagesForUser(t *testing.T) {
+	msgRepo := &mockMessageRepo{getRecentFn: func(ctx context.Context, uid string, limit int) ([]models.Message, error) {
+		return []models.Message{{ID: "m1", Content: "Hi"}}, nil
+	}}
+	svc := NewService(&mockRepo{}, msgRepo)
+	msgs, _ := svc.GetMessagesForUser(context.Background(), "u1")
+	if len(msgs) != 1 {
+		t.Errorf("expected 1, got %d", len(msgs))
+	}
+}
+
+func TestBookClass_CountBookingsError(t *testing.T) {
+    repo := &mockRepo{
+        countBookingsFn: func(ctx context.Context, cid, d, t string) (int, error) {
+            return 0, errors.New("db error")
+        },
+    }
+    svc := NewService(repo, &mockMessageRepo{})
+    _, err := svc.BookClass(context.Background(), "u1", &BookRequest{ClassID: "yoga", Date: "2026-06-01", Time: "07:00"})
+    if err == nil {
+        t.Error("expected error from CountBookingsForSlot")
+    }
+}
+

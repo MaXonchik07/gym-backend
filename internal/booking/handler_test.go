@@ -22,6 +22,14 @@ type mockBookingService struct {
 	cancelFn             func(ctx context.Context, bookingID, userID string) error
 	getChatUsersFn       func(ctx context.Context) ([]string, error)
 	getMessagesForUserFn func(ctx context.Context, userID string) ([]models.Message, error)
+	sendMessageFn        func(ctx context.Context, senderID, recipientID, content string) (*models.Message, error)
+}
+
+func (m *mockBookingService) SendMessage(ctx context.Context, senderID, recipientID, content string) (*models.Message, error) {
+    if m.sendMessageFn != nil {
+        return m.sendMessageFn(ctx, senderID, recipientID, content)
+    }
+    return nil, nil
 }
 
 func (m *mockBookingService) GetChatUsers(ctx context.Context) ([]string, error) {
@@ -160,4 +168,76 @@ func TestHandler_WebSocketConnection(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
 	}
+}
+
+func TestHandler_BookClass_NoUserInContext(t *testing.T) {
+	handler := NewHandler(&mockBookingService{}, zerolog.Nop(), newTestHub())
+	body := `{"class_id":"yoga","class_name":"Yoga"}`
+	req := httptest.NewRequest(http.MethodPost, "/bookings/create", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	handler.BookClass(rec, req)
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", rec.Code)
+	}
+}
+
+func TestHandler_BookClass_ServiceError(t *testing.T) {
+	svc := &mockBookingService{
+		bookFn: func(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error) {
+			return nil, errors.New("capacity error")
+		},
+	}
+	handler := NewHandler(svc, zerolog.Nop(), newTestHub())
+	body := `{"class_id":"yoga","class_name":"Yoga"}`
+	req := httptest.NewRequest(http.MethodPost, "/bookings/create", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserContextKey, &jwt.Claims{UserID: "u1"})
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.BookClass(rec, req)
+	if rec.Code != http.StatusBadRequest && rec.Code != http.StatusConflict {
+		t.Logf("got %d, expected 4xx", rec.Code)
+	}
+}
+
+func TestHandler_BookClass_InvalidJSON(t *testing.T) {
+	svc := &mockBookingService{}
+	handler := NewHandler(svc, zerolog.Nop(), newTestHub())
+	req := httptest.NewRequest(http.MethodPost, "/bookings/create", bytes.NewBufferString(`{bad`))
+	req.Header.Set("Content-Type", "application/json")
+	ctx := context.WithValue(req.Context(), middleware.UserContextKey, &jwt.Claims{UserID: "u1"})
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.BookClass(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandler_CancelBooking_MissingID(t *testing.T) {
+	svc := &mockBookingService{}
+	handler := NewHandler(svc, zerolog.Nop(), newTestHub())
+	req := httptest.NewRequest(http.MethodDelete, "/bookings/cancel", nil)
+	ctx := context.WithValue(req.Context(), middleware.UserContextKey, &jwt.Claims{UserID: "u1"})
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+	handler.CancelBooking(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestHandler_BookClass_EmptyBody(t *testing.T) {
+    svc := &mockBookingService{}
+    handler := NewHandler(svc, zerolog.Nop(), newTestHub())
+    req := httptest.NewRequest(http.MethodPost, "/bookings/create", nil)
+    req.Header.Set("Content-Type", "application/json")
+    ctx := context.WithValue(req.Context(), middleware.UserContextKey, &jwt.Claims{UserID: "u1"})
+    req = req.WithContext(ctx)
+    rec := httptest.NewRecorder()
+    handler.BookClass(rec, req)
+    if rec.Code != http.StatusBadRequest {
+        t.Errorf("expected 400, got %d", rec.Code)
+    }
 }

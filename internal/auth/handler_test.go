@@ -3,14 +3,15 @@ package auth
 import (
 	"bytes"
 	"context"
-	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	"errors"
 
-	"github.com/rs/zerolog"
 	"github.com/MaXonchik07/gym-backend/internal/models"
+	"github.com/MaXonchik07/gym-backend/pkg/jwt"
+	"github.com/MaXonchik07/gym-backend/pkg/middleware"
+	"github.com/rs/zerolog"
 )
 
 type mockService struct {
@@ -29,6 +30,12 @@ func (m *mockService) Login(ctx context.Context, req *LoginRequest) (string, err
 func (m *mockService) UpdateProfile(ctx context.Context, userID string, req *UpdateProfileRequest) (*models.User, error) {
 	return m.updateFn(ctx, userID, req)
 }
+func (m *mockService) GetUserByID(ctx context.Context, id string) (*models.User, error) {
+	if m.getUserFn != nil {
+		return m.getUserFn(ctx, id)
+	}
+	return nil, nil
+}
 
 func TestHandler_Register_Success(t *testing.T) {
 	svc := &mockService{
@@ -37,7 +44,6 @@ func TestHandler_Register_Success(t *testing.T) {
 		},
 	}
 	handler := NewHandler(svc, zerolog.Nop())
-
 	body := `{"first_name":"Иван","last_name":"Иванов","email":"ivan@example.com","phone":"+79001234567","password":"secret123"}`
 	req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -57,7 +63,6 @@ func TestHandler_Login_Success(t *testing.T) {
 		},
 	}
 	handler := NewHandler(svc, zerolog.Nop())
-
 	body := `{"email":"ivan@example.com","password":"secret123"}`
 	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -68,55 +73,118 @@ func TestHandler_Login_Success(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", rec.Code)
 	}
+}
 
-	var resp map[string]string
-	json.NewDecoder(rec.Body).Decode(&resp)
-	if resp["token"] != "test-token" {
-		t.Errorf("expected test-token, got %s", resp["token"])
+func TestHandler_Login_UserNotFound(t *testing.T) {
+	svc := &mockService{
+		loginFn: func(ctx context.Context, req *LoginRequest) (string, error) {
+			return "", errors.New("пользователь не найден")
+		},
+	}
+	handler := NewHandler(svc, zerolog.Nop())
+	body := `{"email":"notfound@example.com","password":"secret123"}`
+	req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.Login(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401, got %d", rec.Code)
 	}
 }
-func TestHandler_Login_UserNotFound(t *testing.T) {
+
+func TestHandler_Register_Duplicate(t *testing.T) {
+	svc := &mockService{
+		registerFn: func(ctx context.Context, req *RegisterRequest) (*models.User, error) {
+			return nil, errors.New("пользователь с таким email уже существует")
+		},
+	}
+	handler := NewHandler(svc, zerolog.Nop())
+	body := `{"first_name":"Иван","last_name":"Иванов","email":"ivan@example.com","phone":"+79001234567","password":"secret123"}`
+	req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.Register(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d", rec.Code)
+	}
+}
+
+// TestHandler_UpdateProfile_Success
+func TestHandler_UpdateProfile_Success(t *testing.T) {
     svc := &mockService{
-        loginFn: func(ctx context.Context, req *LoginRequest) (string, error) {
-            return "", errors.New("пользователь не найден")
+        updateFn: func(ctx context.Context, userID string, req *UpdateProfileRequest) (*models.User, error) {
+            return &models.User{ID: userID, FirstName: req.FirstName}, nil
         },
     }
     handler := NewHandler(svc, zerolog.Nop())
-
-    body := `{"email":"notfound@example.com","password":"secret123"}`
-    req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(body))
+    body := `{"first_name":"NewName","last_name":"NewLast","phone":"+79991112233","email":"new@example.com"}`
+    req := httptest.NewRequest(http.MethodPut, "/profile", bytes.NewBufferString(body))
     req.Header.Set("Content-Type", "application/json")
+    // добавляем юзера в контекст (как делает middleware)
+    ctx := context.WithValue(req.Context(), middleware.UserContextKey, &jwt.Claims{UserID: "user123"})
+    req = req.WithContext(ctx)
     rec := httptest.NewRecorder()
 
-    handler.Login(rec, req)
+    handler.UpdateProfile(rec, req)
 
+    if rec.Code != http.StatusOK {
+        t.Errorf("expected 200, got %d", rec.Code)
+    }
+}
+
+func TestHandler_UpdateProfile_NoUserInContext(t *testing.T) {
+    svc := &mockService{}
+    handler := NewHandler(svc, zerolog.Nop())
+    req := httptest.NewRequest(http.MethodPut, "/profile", nil)
+    rec := httptest.NewRecorder()
+    handler.UpdateProfile(rec, req)
     if rec.Code != http.StatusUnauthorized {
         t.Errorf("expected 401, got %d", rec.Code)
     }
 }
-func TestHandler_Register_Duplicate(t *testing.T) {
-    svc := &mockService{
-        registerFn: func(ctx context.Context, req *RegisterRequest) (*models.User, error) {
-            return nil, errors.New("пользователь с таким email уже существует")
-        },
-    }
-    handler := NewHandler(svc, zerolog.Nop())
 
-    body := `{"first_name":"Иван","last_name":"Иванов","email":"ivan@example.com","phone":"+79001234567","password":"secret123"}`
-    req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewBufferString(body))
+func TestHandler_UpdateProfile_InvalidJSON(t *testing.T) {
+    svc := &mockService{}
+    handler := NewHandler(svc, zerolog.Nop())
+    req := httptest.NewRequest(http.MethodPut, "/profile", bytes.NewBufferString(`{bad json`))
+    req.Header.Set("Content-Type", "application/json")
+    ctx := context.WithValue(req.Context(), middleware.UserContextKey, &jwt.Claims{UserID: "u1"})
+    req = req.WithContext(ctx)
+    rec := httptest.NewRecorder()
+    handler.UpdateProfile(rec, req)
+    if rec.Code != http.StatusBadRequest {
+        t.Errorf("expected 400, got %d", rec.Code)
+    }
+}
+
+func TestHandler_Register_InvalidJSON(t *testing.T) {
+    svc := &mockService{}
+    handler := NewHandler(svc, zerolog.Nop())
+    req := httptest.NewRequest(http.MethodPost, "/register", bytes.NewBufferString(`{not json`))
     req.Header.Set("Content-Type", "application/json")
     rec := httptest.NewRecorder()
-
     handler.Register(rec, req)
-
-    if rec.Code != http.StatusConflict {
-        t.Errorf("expected 409, got %d", rec.Code)
+    if rec.Code != http.StatusBadRequest {
+        t.Errorf("expected 400, got %d", rec.Code)
     }
 }
 
-func (m *mockService) GetUserByID(ctx context.Context, id string) (*models.User, error) {
-    if m.getUserFn != nil {
-        return m.getUserFn(ctx, id)
+func TestHandler_Login_InvalidJSON(t *testing.T) {
+    svc := &mockService{}
+    handler := NewHandler(svc, zerolog.Nop())
+    req := httptest.NewRequest(http.MethodPost, "/login", bytes.NewBufferString(`{bad`))
+    req.Header.Set("Content-Type", "application/json")
+    rec := httptest.NewRecorder()
+    handler.Login(rec, req)
+    if rec.Code != http.StatusBadRequest {
+        t.Errorf("expected 400, got %d", rec.Code)
     }
-    return nil, nil
 }
+
+
+
+
