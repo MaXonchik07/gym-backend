@@ -113,7 +113,6 @@ func TestHandler_Register_Duplicate(t *testing.T) {
 	}
 }
 
-// TestHandler_UpdateProfile_Success
 func TestHandler_UpdateProfile_Success(t *testing.T) {
     svc := &mockService{
         updateFn: func(ctx context.Context, userID string, req *UpdateProfileRequest) (*models.User, error) {
@@ -124,7 +123,6 @@ func TestHandler_UpdateProfile_Success(t *testing.T) {
     body := `{"first_name":"NewName","last_name":"NewLast","phone":"+79991112233","email":"new@example.com"}`
     req := httptest.NewRequest(http.MethodPut, "/profile", bytes.NewBufferString(body))
     req.Header.Set("Content-Type", "application/json")
-    // добавляем юзера в контекст (как делает middleware)
     ctx := context.WithValue(req.Context(), middleware.UserContextKey, &jwt.Claims{UserID: "user123"})
     req = req.WithContext(ctx)
     rec := httptest.NewRecorder()

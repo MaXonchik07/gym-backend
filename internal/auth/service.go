@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+
 	"github.com/MaXonchik07/gym-backend/internal/models"
 	"github.com/MaXonchik07/gym-backend/pkg/jwt"
 	"golang.org/x/crypto/bcrypt"
@@ -70,9 +71,6 @@ func (s *service) UpdateProfile(ctx context.Context, userID string, req *UpdateP
 	user, err := s.repo.GetUserByID(ctx, userID)
 	if err != nil {
 		return nil, err
-	}
-	if user == nil {
-		return nil, errors.New("пользователь не найден")
 	}
 	if req.Email != "" && req.Email != user.Email {
 		existing, _ := s.repo.GetUserByEmail(ctx, req.Email)

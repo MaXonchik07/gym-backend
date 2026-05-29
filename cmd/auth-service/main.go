@@ -18,6 +18,10 @@ import (
 // @description     API для регистрации, входа и управления пользователями.
 // @host            localhost:8080
 // @BasePath        /api/auth
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Введите токен в формате: Bearer {токен}
 
 func main() {
 	cfg := common.LoadConfig()

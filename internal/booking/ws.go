@@ -19,7 +19,7 @@ var upgrader = websocket.Upgrader{
 
 type Hub struct {
 	mu      sync.RWMutex
-	clients map[*websocket.Conn]string // conn -> userID
+	clients map[*websocket.Conn]string 
 	logger  zerolog.Logger
 	msgRepo MessageRepository
 }

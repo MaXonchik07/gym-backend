@@ -20,6 +20,40 @@ definitions:
       phone:
         type: string
     type: object
+  booking.BookRequest:
+    properties:
+      capacity:
+        type: integer
+      class_id:
+        type: string
+      class_name:
+        type: string
+      date:
+        type: string
+      instructor:
+        type: string
+      time:
+        type: string
+    type: object
+  models.Booking:
+    properties:
+      class_id:
+        type: string
+      class_name:
+        type: string
+      created_at:
+        type: string
+      date:
+        type: string
+      id:
+        type: string
+      instructor:
+        type: string
+      time:
+        type: string
+      user_id:
+        type: string
+    type: object
   models.User:
     properties:
       created_at:
@@ -50,6 +84,84 @@ info:
   title: Gym Auth Service API
   version: "1.0"
 paths:
+  /api/bookings:
+    get:
+      description: Получает все бронирования для текущего пользователя
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Booking'
+            type: array
+        "401":
+          description: не авторизован
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Мои записи
+      tags:
+      - bookings
+  /api/bookings/cancel:
+    delete:
+      description: Удаляет бронирование по ID
+      parameters:
+      - description: ID бронирования
+        in: query
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: Запись отменена
+        "400":
+          description: неверный ID
+          schema:
+            type: string
+        "401":
+          description: не авторизован
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Отмена записи
+      tags:
+      - bookings
+  /api/bookings/create:
+    post:
+      consumes:
+      - application/json
+      description: Создаёт бронирование для текущего пользователя
+      parameters:
+      - description: Данные записи
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/booking.BookRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.Booking'
+        "400":
+          description: неверный запрос
+          schema:
+            type: string
+        "409":
+          description: конфликт
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: Запись на занятие
+      tags:
+      - bookings
   /login:
     post:
       consumes:
@@ -108,4 +220,10 @@ paths:
       summary: Регистрация
       tags:
       - auth
+securityDefinitions:
+  BearerAuth:
+    description: 'Введите токен в формате: Bearer {токен}'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

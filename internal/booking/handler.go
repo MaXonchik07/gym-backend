@@ -19,7 +19,7 @@ func NewHandler(service Service, logger zerolog.Logger, hub *Hub) *Handler {
 	return &Handler{service: service, logger: logger, hub: hub}
 }
 
-// BookClass записывает пользователя на занятие
+// @Security BearerAuth
 // @Summary      Запись на занятие
 // @Description  Создаёт бронирование для текущего пользователя
 // @Tags         bookings
@@ -57,7 +57,7 @@ func (h *Handler) BookClass(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(booking)
 }
 
-// GetBookings возвращает список бронирований пользователя
+// @Security BearerAuth
 // @Summary      Мои записи
 // @Description  Получает все бронирования для текущего пользователя
 // @Tags         bookings
@@ -80,7 +80,8 @@ func (h *Handler) GetBookings(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(bookings)
 }
 
-// CancelBooking отменяет запись
+
+// @Security BearerAuth
 // @Summary      Отмена записи
 // @Description  Удаляет бронирование по ID
 // @Tags         bookings

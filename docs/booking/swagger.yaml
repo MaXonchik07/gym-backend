@@ -21,6 +21,8 @@ definitions:
     type: object
   booking.BookRequest:
     properties:
+      capacity:
+        type: integer
       class_id:
         type: string
       class_name:
@@ -93,6 +95,8 @@ paths:
           description: не авторизован
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Мои записи
       tags:
       - bookings
@@ -116,6 +120,8 @@ paths:
           description: не авторизован
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Отмена записи
       tags:
       - bookings
@@ -146,6 +152,8 @@ paths:
           description: конфликт
           schema:
             type: string
+      security:
+      - BearerAuth: []
       summary: Запись на занятие
       tags:
       - bookings
@@ -207,4 +215,10 @@ paths:
       summary: Регистрация
       tags:
       - auth
+securityDefinitions:
+  BearerAuth:
+    description: 'Введите токен в формате: Bearer {токен}'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

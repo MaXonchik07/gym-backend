@@ -26,6 +26,10 @@ func corsMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Введите токен в формате: Bearer {токен}
 func main() {
 	cfg := common.LoadConfig()
 	log := logger.NewLogger(cfg.LogLevel)

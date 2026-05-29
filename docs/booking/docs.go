@@ -17,6 +17,11 @@ const docTemplate = `{
     "paths": {
         "/api/bookings": {
             "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Получает все бронирования для текущего пользователя",
                 "produces": [
                     "application/json"
@@ -46,6 +51,11 @@ const docTemplate = `{
         },
         "/api/bookings/cancel": {
             "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Удаляет бронирование по ID",
                 "tags": [
                     "bookings"
@@ -81,6 +91,11 @@ const docTemplate = `{
         },
         "/api/bookings/create": {
             "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
                 "description": "Создаёт бронирование для текущего пользователя",
                 "consumes": [
                     "application/json"
@@ -250,6 +265,9 @@ const docTemplate = `{
         "booking.BookRequest": {
             "type": "object",
             "properties": {
+                "capacity": {
+                    "type": "integer"
+                },
                 "class_id": {
                     "type": "string"
                 },
@@ -330,6 +348,14 @@ const docTemplate = `{
                     "type": "string"
                 }
             }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "description": "Введите токен в формате: Bearer {токен}",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }`
