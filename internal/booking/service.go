@@ -15,6 +15,8 @@ type Service interface {
 	GetConversation(ctx context.Context, userID string) ([]models.Message, error)
 	GetMessagesForUser(ctx context.Context, userID string) ([]models.Message, error)
 	GetRecentMessagesForUser(ctx context.Context, userID string) ([]models.Message, error)
+	GetChatUsersWithNames(ctx context.Context) ([]ChatUser, error)
+	GetUserName(ctx context.Context, userID string) (string, string, error)
 }
 
 type service struct {
@@ -22,16 +24,46 @@ type service struct {
 	msgRepo MessageRepository
 }
 
+type ChatUser struct {
+    UserID    string `json:"user_id"`
+    FirstName string `json:"first_name"`
+    LastName  string `json:"last_name"`
+}
+
+func (s *service) GetChatUsersWithNames(ctx context.Context) ([]ChatUser, error) {
+    ids, err := s.msgRepo.GetChatUsers(ctx)
+    if err != nil {
+        return nil, err
+    }
+    var users []ChatUser
+    for _, id := range ids {
+        firstName, lastName, err := s.msgRepo.GetUserNameByID(ctx, id)
+        if err != nil {
+            continue
+        }
+        users = append(users, ChatUser{
+            UserID:    id,
+            FirstName: firstName,
+            LastName:  lastName,
+        })
+    }
+    return users, nil
+}
+
+func (s *service) GetUserName(ctx context.Context, userID string) (string, string, error) {
+    return s.msgRepo.GetUserNameByID(ctx, userID)
+}
+
 func NewService(repo Repository, msgRepo MessageRepository) Service {
 	return &service{repo: repo, msgRepo: msgRepo}
 }
 
 func (s *service) GetRecentMessagesForUser(ctx context.Context, userID string) ([]models.Message, error) {
-    return s.msgRepo.GetRecentMessagesForUser(ctx, userID, 0) // 0 – без лимита, все сообщения
+	return s.msgRepo.GetRecentMessagesForUser(ctx, userID, 0) // 0 – без лимита, все сообщения
 }
 
 func (s *service) GetMessagesForUser(ctx context.Context, userID string) ([]models.Message, error) {
-    return s.msgRepo.GetRecentMessagesForUser(ctx, userID, 50)
+	return s.msgRepo.GetRecentMessagesForUser(ctx, userID, 50)
 }
 
 func (s *service) BookClass(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error) {

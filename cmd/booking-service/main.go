@@ -59,6 +59,7 @@ func main() {
 	mux.Handle("/api/bookings/cancel", middleware.AuthMiddleware(cfg.JWTSecret)(authMux))
 	mux.Handle("/api/admin/chat-users", middleware.AuthMiddleware(cfg.JWTSecret)(http.HandlerFunc(handler.GetChatUsers)))
 	mux.Handle("/api/admin/chat-history", middleware.AuthMiddleware(cfg.JWTSecret)(http.HandlerFunc(handler.GetChatHistory)))
+	mux.Handle("/api/admin/chat-users-with-names", middleware.AuthMiddleware(cfg.JWTSecret)(http.HandlerFunc(handler.GetChatUsersWithNames)))
 	mux.HandleFunc("/ws", hub.HandleWebSocket)
 	mux.Handle("/swagger/", httpSwagger.WrapHandler)
 

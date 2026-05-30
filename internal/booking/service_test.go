@@ -64,18 +64,26 @@ func (m *mockRepo) CountBookingsForSlot(ctx context.Context, classID, date, time
 }
 
 type mockMessageRepo struct {
-	getConversationFn func(ctx context.Context, userID string, limit int) ([]models.Message, error)
-	getChatUsersFn    func(ctx context.Context) ([]string, error)
+	getConversationFn          func(ctx context.Context, userID string, limit int) ([]models.Message, error)
+	getChatUsersFn             func(ctx context.Context) ([]string, error)
 	getRecentMessagesForUserFn func(ctx context.Context, userID string, limit int) ([]models.Message, error)
+	getUserNameByIDFn          func(ctx context.Context, userID string) (string, string, error)
+}
+
+func (m *mockMessageRepo) GetUserNameByID(ctx context.Context, userID string) (string, string, error) {
+    if m.getUserNameByIDFn != nil {
+        return m.getUserNameByIDFn(ctx, userID)
+    }
+    return "Имя", "Фамилия", nil
 }
 
 func (m *mockMessageRepo) SaveMessage(ctx context.Context, msg *models.Message) error { return nil }
 
 func (m *mockMessageRepo) GetRecentMessagesForUser(ctx context.Context, userID string, limit int) ([]models.Message, error) {
-    if m.getRecentMessagesForUserFn != nil {
-        return m.getRecentMessagesForUserFn(ctx, userID, limit)
-    }
-    return nil, nil
+	if m.getRecentMessagesForUserFn != nil {
+		return m.getRecentMessagesForUserFn(ctx, userID, limit)
+	}
+	return nil, nil
 }
 func (m *mockMessageRepo) GetChatUsers(ctx context.Context) ([]string, error) {
 	if m.getChatUsersFn != nil {

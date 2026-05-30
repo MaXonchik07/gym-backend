@@ -15,13 +15,29 @@ import (
 )
 
 type mockBookingService struct {
-	bookFn              func(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error)
-	getFn               func(ctx context.Context, userID string) ([]models.Booking, error)
-	cancelFn            func(ctx context.Context, bookingID, userID string) error
-	getChatFn           func(ctx context.Context) ([]string, error)
-	getConvFn           func(ctx context.Context, userID string) ([]models.Message, error)
-	getMessagesFn       func(ctx context.Context, userID string) ([]models.Message, error)
-	getRecentMessagesFn func(ctx context.Context, userID string) ([]models.Message, error)
+	bookFn                  func(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error)
+	getFn                   func(ctx context.Context, userID string) ([]models.Booking, error)
+	cancelFn                func(ctx context.Context, bookingID, userID string) error
+	getChatFn               func(ctx context.Context) ([]string, error)
+	getConvFn               func(ctx context.Context, userID string) ([]models.Message, error)
+	getMessagesFn           func(ctx context.Context, userID string) ([]models.Message, error)
+	getRecentMessagesFn     func(ctx context.Context, userID string) ([]models.Message, error)
+	getChatUsersWithNamesFn func(ctx context.Context) ([]ChatUser, error)
+	getUserNameFn func(ctx context.Context, userID string) (string, string, error)
+}
+
+func (m *mockBookingService) GetChatUsersWithNames(ctx context.Context) ([]ChatUser, error) {
+	if m.getChatUsersWithNamesFn != nil {
+		return m.getChatUsersWithNamesFn(ctx)
+	}
+	return nil, nil
+}
+
+func (m *mockBookingService) GetUserName(ctx context.Context, userID string) (string, string, error) {
+    if m.getUserNameFn != nil {
+        return m.getUserNameFn(ctx, userID)
+    }
+    return "Имя", "Фамилия", nil
 }
 
 func (m *mockBookingService) BookClass(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error) {

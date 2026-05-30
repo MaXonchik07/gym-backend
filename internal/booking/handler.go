@@ -154,3 +154,18 @@ func (h *Handler) GetChatHistory(w http.ResponseWriter, r *http.Request) {
     }
     json.NewEncoder(w).Encode(msgs)
 }
+
+func (h *Handler) GetChatUsersWithNames(w http.ResponseWriter, r *http.Request) {
+    claims, ok := middleware.GetUserClaims(r.Context())
+    if !ok || claims.Role != "admin" {
+        http.Error(w, "forbidden", http.StatusForbidden)
+        return
+    }
+    users, err := h.service.GetChatUsersWithNames(r.Context())
+    if err != nil {
+        h.logger.Error().Err(err).Msg("get chat users with names failed")
+        http.Error(w, "internal error", http.StatusInternalServerError)
+        return
+    }
+    json.NewEncoder(w).Encode(users)
+}

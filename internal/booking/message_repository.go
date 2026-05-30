@@ -12,10 +12,18 @@ type MessageRepository interface {
 	GetRecentMessagesForUser(ctx context.Context, userID string, limit int) ([]models.Message, error)
 	GetChatUsers(ctx context.Context) ([]string, error)
 	GetConversation(ctx context.Context, userID string, limit int) ([]models.Message, error)
+	GetUserNameByID(ctx context.Context, userID string) (string, string, error)
 }
 
 type messageRepo struct {
 	pool DBPool
+}
+
+func (r *messageRepo) GetUserNameByID(ctx context.Context, userID string) (string, string, error) {
+    query := `SELECT first_name, last_name FROM users WHERE id = $1`
+    var firstName, lastName string
+    err := r.pool.QueryRow(ctx, query, userID).Scan(&firstName, &lastName)
+    return firstName, lastName, err
 }
 
 func NewMessageRepository(pool DBPool) MessageRepository {
