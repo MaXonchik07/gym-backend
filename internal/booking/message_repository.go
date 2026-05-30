@@ -4,12 +4,14 @@ import (
 	"context"
 
 	"github.com/MaXonchik07/gym-backend/internal/models"
+	"github.com/jackc/pgx/v5"
 )
 
 type MessageRepository interface {
 	SaveMessage(ctx context.Context, msg *models.Message) error
 	GetRecentMessagesForUser(ctx context.Context, userID string, limit int) ([]models.Message, error)
 	GetChatUsers(ctx context.Context) ([]string, error)
+	GetConversation(ctx context.Context, userID string, limit int) ([]models.Message, error)
 }
 
 type messageRepo struct {
@@ -27,11 +29,18 @@ func (r *messageRepo) SaveMessage(ctx context.Context, msg *models.Message) erro
 
 func (r *messageRepo) GetRecentMessagesForUser(ctx context.Context, userID string, limit int) ([]models.Message, error) {
 	query := `
-		SELECT id, sender_id, COALESCE(recipient_id, ''), content, created_at
-		FROM messages
-		WHERE sender_id = $1 OR recipient_id = $1
-		ORDER BY created_at ASC LIMIT $2`
-	rows, err := r.pool.Query(ctx, query, userID, limit)
+        SELECT id, sender_id, COALESCE(recipient_id, ''), content, created_at
+        FROM messages
+        WHERE sender_id = $1 OR recipient_id = $1
+        ORDER BY created_at ASC`
+	var rows pgx.Rows
+	var err error
+	if limit > 0 {
+		query += ` LIMIT $2`
+		rows, err = r.pool.Query(ctx, query, userID, limit)
+	} else {
+		rows, err = r.pool.Query(ctx, query, userID)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -65,4 +74,28 @@ func (r *messageRepo) GetChatUsers(ctx context.Context) ([]string, error) {
 		users = append(users, userID)
 	}
 	return users, rows.Err()
+}
+
+func (r *messageRepo) GetConversation(ctx context.Context, userID string, limit int) ([]models.Message, error) {
+	query := `
+        SELECT id, sender_id, COALESCE(recipient_id, ''), content, created_at
+        FROM messages
+        WHERE (sender_id = 'support' AND recipient_id = $1)
+           OR (sender_id = $1 AND recipient_id = 'support')
+        ORDER BY created_at ASC LIMIT $2`
+	rows, err := r.pool.Query(ctx, query, userID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var msgs []models.Message
+	for rows.Next() {
+		var m models.Message
+		if err := rows.Scan(&m.ID, &m.SenderID, &m.RecipientID, &m.Content, &m.CreatedAt); err != nil {
+			return nil, err
+		}
+		msgs = append(msgs, m)
+	}
+	return msgs, rows.Err()
 }

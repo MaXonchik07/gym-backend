@@ -80,7 +80,6 @@ func (h *Handler) GetBookings(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(bookings)
 }
 
-
 // @Security BearerAuth
 // @Summary      Отмена записи
 // @Description  Удаляет бронирование по ID
@@ -133,21 +132,25 @@ func (h *Handler) GetChatUsers(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetChatHistory(w http.ResponseWriter, r *http.Request) {
-	claims, ok := middleware.GetUserClaims(r.Context())
-	if !ok || claims.Role != "admin" {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
-	userID := r.URL.Query().Get("user_id")
-	if userID == "" {
-		http.Error(w, "user_id required", http.StatusBadRequest)
-		return
-	}
-	msgs, err := h.service.GetMessagesForUser(r.Context(), userID)
-	if err != nil {
-		h.logger.Error().Err(err).Msg("get chat history failed")
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-	json.NewEncoder(w).Encode(msgs)
+    claims, ok := middleware.GetUserClaims(r.Context())
+    if !ok {
+        http.Error(w, "unauthorized", http.StatusUnauthorized)
+        return
+    }
+    userID := r.URL.Query().Get("user_id")
+    if userID == "" {
+        http.Error(w, "user_id required", http.StatusBadRequest)
+        return
+    }
+    if claims.Role != "admin" && claims.UserID != userID {
+        http.Error(w, "forbidden", http.StatusForbidden)
+        return
+    }
+    msgs, err := h.service.GetRecentMessagesForUser(r.Context(), userID)
+    if err != nil {
+        h.logger.Error().Err(err).Msg("get chat history failed")
+        http.Error(w, "internal error", http.StatusInternalServerError)
+        return
+    }
+    json.NewEncoder(w).Encode(msgs)
 }

@@ -5,13 +5,13 @@ import (
 )
 
 type Class struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Description  string `json:"description"`
-	Duration     string `json:"duration"`
-	Capacity     int    `json:"capacity"`
-	Difficulty   string `json:"difficulty"`
-	Instructor   string `json:"instructor"`
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Duration    string `json:"duration"`
+	Capacity    int    `json:"capacity"`
+	Difficulty  string `json:"difficulty"`
+	Instructor  string `json:"instructor"`
 }
 
 type Booking struct {

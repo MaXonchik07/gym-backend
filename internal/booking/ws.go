@@ -7,10 +7,10 @@ import (
 	"sync"
 	"time"
 
+	"github.com/MaXonchik07/gym-backend/internal/models"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
-	"github.com/MaXonchik07/gym-backend/internal/models"
 )
 
 var upgrader = websocket.Upgrader{
@@ -19,7 +19,7 @@ var upgrader = websocket.Upgrader{
 
 type Hub struct {
 	mu      sync.RWMutex
-	clients map[*websocket.Conn]string 
+	clients map[*websocket.Conn]string
 	logger  zerolog.Logger
 	msgRepo MessageRepository
 }
@@ -50,7 +50,7 @@ func (h *Hub) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		h.mu.Unlock()
 		conn.Close()
 	}()
-	
+
 	if userID != "" {
 		msgs, _ := h.msgRepo.GetRecentMessagesForUser(context.Background(), userID, 50)
 		history, _ := json.Marshal(msgs)

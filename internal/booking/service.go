@@ -12,7 +12,9 @@ type Service interface {
 	GetUserBookings(ctx context.Context, userID string) ([]models.Booking, error)
 	CancelBooking(ctx context.Context, bookingID, userID string) error
 	GetChatUsers(ctx context.Context) ([]string, error)
+	GetConversation(ctx context.Context, userID string) ([]models.Message, error)
 	GetMessagesForUser(ctx context.Context, userID string) ([]models.Message, error)
+	GetRecentMessagesForUser(ctx context.Context, userID string) ([]models.Message, error)
 }
 
 type service struct {
@@ -22,6 +24,14 @@ type service struct {
 
 func NewService(repo Repository, msgRepo MessageRepository) Service {
 	return &service{repo: repo, msgRepo: msgRepo}
+}
+
+func (s *service) GetRecentMessagesForUser(ctx context.Context, userID string) ([]models.Message, error) {
+    return s.msgRepo.GetRecentMessagesForUser(ctx, userID, 0) // 0 – без лимита, все сообщения
+}
+
+func (s *service) GetMessagesForUser(ctx context.Context, userID string) ([]models.Message, error) {
+    return s.msgRepo.GetRecentMessagesForUser(ctx, userID, 50)
 }
 
 func (s *service) BookClass(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error) {
@@ -67,8 +77,8 @@ func (s *service) GetChatUsers(ctx context.Context) ([]string, error) {
 	return s.msgRepo.GetChatUsers(ctx)
 }
 
-func (s *service) GetMessagesForUser(ctx context.Context, userID string) ([]models.Message, error) {
-	return s.msgRepo.GetRecentMessagesForUser(ctx, userID, 50)
+func (s *service) GetConversation(ctx context.Context, userID string) ([]models.Message, error) {
+	return s.msgRepo.GetConversation(ctx, userID, 50)
 }
 
 type BookRequest struct {

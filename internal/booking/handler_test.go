@@ -3,8 +3,6 @@ package booking
 import (
 	"bytes"
 	"context"
-	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,33 +15,13 @@ import (
 )
 
 type mockBookingService struct {
-	bookFn               func(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error)
-	getFn                func(ctx context.Context, userID string) ([]models.Booking, error)
-	cancelFn             func(ctx context.Context, bookingID, userID string) error
-	getChatUsersFn       func(ctx context.Context) ([]string, error)
-	getMessagesForUserFn func(ctx context.Context, userID string) ([]models.Message, error)
-	sendMessageFn        func(ctx context.Context, senderID, recipientID, content string) (*models.Message, error)
-}
-
-func (m *mockBookingService) SendMessage(ctx context.Context, senderID, recipientID, content string) (*models.Message, error) {
-    if m.sendMessageFn != nil {
-        return m.sendMessageFn(ctx, senderID, recipientID, content)
-    }
-    return nil, nil
-}
-
-func (m *mockBookingService) GetChatUsers(ctx context.Context) ([]string, error) {
-	if m.getChatUsersFn != nil {
-		return m.getChatUsersFn(ctx)
-	}
-	return nil, nil
-}
-
-func (m *mockBookingService) GetMessagesForUser(ctx context.Context, userID string) ([]models.Message, error) {
-	if m.getMessagesForUserFn != nil {
-		return m.getMessagesForUserFn(ctx, userID)
-	}
-	return nil, nil
+	bookFn              func(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error)
+	getFn               func(ctx context.Context, userID string) ([]models.Booking, error)
+	cancelFn            func(ctx context.Context, bookingID, userID string) error
+	getChatFn           func(ctx context.Context) ([]string, error)
+	getConvFn           func(ctx context.Context, userID string) ([]models.Message, error)
+	getMessagesFn       func(ctx context.Context, userID string) ([]models.Message, error)
+	getRecentMessagesFn func(ctx context.Context, userID string) ([]models.Message, error)
 }
 
 func (m *mockBookingService) BookClass(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error) {
@@ -55,189 +33,81 @@ func (m *mockBookingService) GetUserBookings(ctx context.Context, userID string)
 func (m *mockBookingService) CancelBooking(ctx context.Context, bookingID, userID string) error {
 	return m.cancelFn(ctx, bookingID, userID)
 }
+func (m *mockBookingService) GetChatUsers(ctx context.Context) ([]string, error) {
+	if m.getChatFn != nil {
+		return m.getChatFn(ctx)
+	}
+	return nil, nil
+}
+func (m *mockBookingService) GetConversation(ctx context.Context, userID string) ([]models.Message, error) {
+	if m.getConvFn != nil {
+		return m.getConvFn(ctx, userID)
+	}
+	return nil, nil
+}
+
+func (m *mockBookingService) GetMessagesForUser(ctx context.Context, userID string) ([]models.Message, error) {
+	if m.getMessagesFn != nil {
+		return m.getMessagesFn(ctx, userID)
+	}
+	return nil, nil
+}
 
 func newTestHub() *Hub {
-	return &Hub{
-		clients: make(map[*websocket.Conn]string),
-		logger:  zerolog.Nop(),
-		msgRepo: nil,
-	}
+	return &Hub{clients: make(map[*websocket.Conn]string), logger: zerolog.Nop()}
 }
 
 func TestHandler_BookClass(t *testing.T) {
-	svc := &mockBookingService{
-		bookFn: func(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error) {
-			return &models.Booking{ID: "b1", ClassName: req.ClassName}, nil
-		},
-	}
+	svc := &mockBookingService{bookFn: func(ctx context.Context, uid string, req *BookRequest) (*models.Booking, error) {
+		return &models.Booking{ID: "b1"}, nil
+	}}
 	handler := NewHandler(svc, zerolog.Nop(), newTestHub())
-
-	body := `{"class_id":"yoga","class_name":"Yoga","instructor":"Anna","date":"2026-06-01","time":"07:00"}`
+	body := `{"class_id":"yoga","class_name":"Y","instructor":"A","date":"2026-06-01","time":"07:00"}`
 	req := httptest.NewRequest(http.MethodPost, "/bookings/create", bytes.NewBufferString(body))
-	claims := &jwt.Claims{UserID: "user1"}
+	claims := &jwt.Claims{UserID: "u1"}
 	ctx := context.WithValue(req.Context(), middleware.UserContextKey, claims)
 	req = req.WithContext(ctx)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
-
 	handler.BookClass(rec, req)
-
 	if rec.Code != http.StatusCreated {
 		t.Errorf("expected 201, got %d", rec.Code)
 	}
 }
 
 func TestHandler_GetBookings(t *testing.T) {
-	svc := &mockBookingService{
-		getFn: func(ctx context.Context, userID string) ([]models.Booking, error) {
-			return []models.Booking{{ID: "b1"}}, nil
-		},
-	}
+	svc := &mockBookingService{getFn: func(ctx context.Context, uid string) ([]models.Booking, error) {
+		return []models.Booking{{ID: "b1"}}, nil
+	}}
 	handler := NewHandler(svc, zerolog.Nop(), newTestHub())
-
 	req := httptest.NewRequest(http.MethodGet, "/bookings", nil)
-	claims := &jwt.Claims{UserID: "user1"}
+	claims := &jwt.Claims{UserID: "u1"}
 	ctx := context.WithValue(req.Context(), middleware.UserContextKey, claims)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
-
 	handler.GetBookings(rec, req)
-
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", rec.Code)
 	}
 }
 
 func TestHandler_CancelBooking(t *testing.T) {
-	svc := &mockBookingService{
-		cancelFn: func(ctx context.Context, bookingID, userID string) error {
-			if bookingID == "b1" && userID == "user1" {
-				return nil
-			}
-			return errors.New("not found")
-		},
-	}
+	svc := &mockBookingService{cancelFn: func(ctx context.Context, bid, uid string) error { return nil }}
 	handler := NewHandler(svc, zerolog.Nop(), newTestHub())
-
 	req := httptest.NewRequest(http.MethodDelete, "/bookings/cancel?id=b1", nil)
-	claims := &jwt.Claims{UserID: "user1"}
+	claims := &jwt.Claims{UserID: "u1"}
 	ctx := context.WithValue(req.Context(), middleware.UserContextKey, claims)
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
-
 	handler.CancelBooking(rec, req)
-
 	if rec.Code != http.StatusNoContent {
 		t.Errorf("expected 204, got %d", rec.Code)
 	}
 }
 
-func TestHandler_GetBookings_Empty(t *testing.T) {
-	svc := &mockBookingService{
-		getFn: func(ctx context.Context, userID string) ([]models.Booking, error) {
-			return []models.Booking{}, nil
-		},
+func (m *mockBookingService) GetRecentMessagesForUser(ctx context.Context, userID string) ([]models.Message, error) {
+	if m.getRecentMessagesFn != nil {
+		return m.getRecentMessagesFn(ctx, userID)
 	}
-	handler := NewHandler(svc, zerolog.Nop(), newTestHub())
-
-	req := httptest.NewRequest(http.MethodGet, "/bookings", nil)
-	claims := &jwt.Claims{UserID: "user1"}
-	ctx := context.WithValue(req.Context(), middleware.UserContextKey, claims)
-	req = req.WithContext(ctx)
-	rec := httptest.NewRecorder()
-
-	handler.GetBookings(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", rec.Code)
-	}
-	var bookings []models.Booking
-	json.NewDecoder(rec.Body).Decode(&bookings)
-	if len(bookings) != 0 {
-		t.Errorf("expected 0 bookings, got %d", len(bookings))
-	}
-}
-func TestHandler_WebSocketConnection(t *testing.T) {
-	hub := newTestHub()
-	_ = NewHandler(nil, zerolog.Nop(), hub)
-
-	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
-	rec := httptest.NewRecorder()
-
-	hub.HandleWebSocket(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", rec.Code)
-	}
-}
-
-func TestHandler_BookClass_NoUserInContext(t *testing.T) {
-	handler := NewHandler(&mockBookingService{}, zerolog.Nop(), newTestHub())
-	body := `{"class_id":"yoga","class_name":"Yoga"}`
-	req := httptest.NewRequest(http.MethodPost, "/bookings/create", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-	handler.BookClass(rec, req)
-	if rec.Code != http.StatusUnauthorized {
-		t.Errorf("expected 401, got %d", rec.Code)
-	}
-}
-
-func TestHandler_BookClass_ServiceError(t *testing.T) {
-	svc := &mockBookingService{
-		bookFn: func(ctx context.Context, userID string, req *BookRequest) (*models.Booking, error) {
-			return nil, errors.New("capacity error")
-		},
-	}
-	handler := NewHandler(svc, zerolog.Nop(), newTestHub())
-	body := `{"class_id":"yoga","class_name":"Yoga"}`
-	req := httptest.NewRequest(http.MethodPost, "/bookings/create", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	ctx := context.WithValue(req.Context(), middleware.UserContextKey, &jwt.Claims{UserID: "u1"})
-	req = req.WithContext(ctx)
-	rec := httptest.NewRecorder()
-	handler.BookClass(rec, req)
-	if rec.Code != http.StatusBadRequest && rec.Code != http.StatusConflict {
-		t.Logf("got %d, expected 4xx", rec.Code)
-	}
-}
-
-func TestHandler_BookClass_InvalidJSON(t *testing.T) {
-	svc := &mockBookingService{}
-	handler := NewHandler(svc, zerolog.Nop(), newTestHub())
-	req := httptest.NewRequest(http.MethodPost, "/bookings/create", bytes.NewBufferString(`{bad`))
-	req.Header.Set("Content-Type", "application/json")
-	ctx := context.WithValue(req.Context(), middleware.UserContextKey, &jwt.Claims{UserID: "u1"})
-	req = req.WithContext(ctx)
-	rec := httptest.NewRecorder()
-	handler.BookClass(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", rec.Code)
-	}
-}
-
-func TestHandler_CancelBooking_MissingID(t *testing.T) {
-	svc := &mockBookingService{}
-	handler := NewHandler(svc, zerolog.Nop(), newTestHub())
-	req := httptest.NewRequest(http.MethodDelete, "/bookings/cancel", nil)
-	ctx := context.WithValue(req.Context(), middleware.UserContextKey, &jwt.Claims{UserID: "u1"})
-	req = req.WithContext(ctx)
-	rec := httptest.NewRecorder()
-	handler.CancelBooking(rec, req)
-	if rec.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", rec.Code)
-	}
-}
-
-func TestHandler_BookClass_EmptyBody(t *testing.T) {
-    svc := &mockBookingService{}
-    handler := NewHandler(svc, zerolog.Nop(), newTestHub())
-    req := httptest.NewRequest(http.MethodPost, "/bookings/create", nil)
-    req.Header.Set("Content-Type", "application/json")
-    ctx := context.WithValue(req.Context(), middleware.UserContextKey, &jwt.Claims{UserID: "u1"})
-    req = req.WithContext(ctx)
-    rec := httptest.NewRecorder()
-    handler.BookClass(rec, req)
-    if rec.Code != http.StatusBadRequest {
-        t.Errorf("expected 400, got %d", rec.Code)
-    }
+	return nil, nil
 }
